@@ -1,0 +1,38 @@
+replicaCount: 2
+
+image:
+  repository: demo-api
+  tag: 1.0.0
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8002
+  targetPort: 8002
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+probes:
+  liveness:
+    path: "/health"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+  readiness:
+    path: "/health"
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    labels:
+      release: monitoring

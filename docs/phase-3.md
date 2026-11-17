@@ -578,7 +578,6 @@ Du skulle gerne kunne finde logs fra vores log-generator.
 
 
 
-programmingwithwolfgang.com
 
 
 Prøv derefter:
@@ -600,7 +599,7 @@ count_over_time({namespace="demo-app"}[5m])
 
 
 Det sidste eksempel viser, hvordan LogQL også kan bruges til at beregne logvolumen.
-21. Opret et Grafana dashboard
+1.  Opret et Grafana dashboard
 Nu hvor logs virker, kan du oprette et dashboard.
 
 Gå til:
@@ -731,3 +730,404 @@ Her er de dokumenter, jeg anbefaler, at du bruger som opslagsværker, mens du ar
 - Grafana Alloy documentation
 - Collect Kubernetes logs with Alloy
 - LogQL documentation
+
+--- notes
+
+Denne fase implementeret centraliseret kubernetes logging vedat bruge Grafana Loki og Grafana Alloy
+
+# Arkitektur
+Kubernetes Pods -> Grafana Alloy -> Loki -> Grafana
+
+## Komponenter
+
+### Loki
+
+- monolithic deployments
+- Filsystems storage
+- Persistent volume claims
+- Seven-day log retention
+- Helm-managed ocnfiguration
+
+### Grafana Alloy
+
+- Kubernetes pod discovery
+- Kubernetes API-based log collection
+- Log forwarding to Loki
+- Helm-managed configuration
+
+### Grafana
+
+- Loki data source
+- Explore and LogQL
+- Kubernetes application log dashboard
+
+### Validation
+
+- Loki pod is Running
+- Loki PVC is Bound
+- Loki Gateway is available
+- Alloy Deployment is Running
+- Alloy can discover Kubernetes pods
+- Logs are visible in Grafana Explore
+- LogQL queries return results
+
+
+### Cloud migration
+the local filesystem storage configuration is inteded for Kind development
+
+for cloud deploument, evaluate managed object storage such as Amazon S3, Google Cloud Storage or Azure Blob Storage.
+
+
+--- Documentation
+
+# Kubernetes Observability Platform – Logging
+
+## 1. Overview
+
+This project uses Grafana Loki and Grafana Alloy to collect, store, and query Kubernetes container logs.
+
+The logging stack provides centralized log collection across Kubernetes namespaces and makes application and infrastructure logs accessible through Grafana.
+
+### Components
+
+| Component | Responsibility |
+|---|---|
+| Kubernetes | Runs workloads and containers |
+| Grafana Alloy | Discovers pods and collects container logs |
+| Grafana Loki | Stores and indexes log streams |
+| Grafana | Queries and visualizes logs using LogQL |
+
+## 2. Architecture
+
+```text
+Kubernetes Cluster
+│
+├── monitoring namespace
+│   ├── Prometheus
+│   └── Grafana
+│
+├── logging namespace
+│   ├── Grafana Alloy
+│   └── Loki
+│       └── Loki Gateway
+│
+└── demo-app namespace
+    └── log-generator
+         │
+         ▼
+    Grafana Alloy
+         │
+         ▼
+    Loki Gateway
+         │
+         ▼
+    Grafana Explore
+```
+
+### Log collection flow
+
+1. Applications generate container logs.
+2. Grafana Alloy discovers Kubernetes pods.
+3. Alloy reads container logs through the Kubernetes API.
+4. Alloy forwards log entries to Loki.
+5. Loki stores the log streams.
+6. Grafana queries Loki using LogQL.
+
+## 3. Namespaces
+
+The platform uses separate namespaces for logical separation.
+
+| Namespace | Purpose |
+|---|---|
+| monitoring | Prometheus and Grafana |
+| logging | Loki and Grafana Alloy |
+| demo-app | Demo workloads |
+
+## 4. Grafana Alloy
+
+Grafana Alloy is responsible for discovering Kubernetes pods and collecting their container logs.
+
+The configured Alloy pipeline uses:
+
+- `discovery.kubernetes`
+- `loki.source.kubernetes`
+- `loki.write`
+
+### Kubernetes permissions
+
+Alloy uses a Kubernetes ServiceAccount:
+
+`logging/alloy`
+
+The following permissions were validated:
+
+```bash
+kubectl auth can-i list pods \
+  --as=system:serviceaccount:logging:alloy \
+  --all-namespaces
+```
+
+```bash
+kubectl auth can-i get pods/log \
+  --as=system:serviceaccount:logging:alloy \
+  --all-namespaces
+```
+
+Both commands returned:
+
+```text
+yes
+```
+
+This confirms that Alloy has the required permissions to discover pods and access their logs.
+
+### Check Alloy status
+
+```bash
+kubectl get pods -n logging
+```
+
+Check Alloy logs:
+
+```bash
+kubectl logs deployment/alloy -n logging --tail=100
+```
+
+Search for log stream activity:
+
+```bash
+kubectl logs deployment/alloy -n logging --since=2h \
+  | grep 'opened log stream'
+```
+
+## 5. Loki
+
+Loki is the centralized log storage backend.
+
+Grafana Alloy forwards log entries to Loki through the Loki Gateway.
+
+### Grafana datasource configuration
+
+Configure Loki as a Grafana datasource.
+
+| Setting | Value |
+|---|---|
+| Datasource type | Loki |
+| URL | `http://loki-gateway.logging.svc.cluster.local` |
+
+The URL uses the Kubernetes service DNS name and the gateway's service port.
+
+After configuring the datasource, use **Save & test** to verify connectivity.
+
+### Check Loki services
+
+```bash
+kubectl get svc -n logging
+```
+
+### Check Loki readiness
+
+```bash
+kubectl port-forward -n logging svc/loki-gateway 3100:80
+```
+
+In another terminal:
+
+```bash
+curl http://localhost:3100/ready
+```
+
+Expected response:
+
+```text
+ready
+```
+
+## 6. LogQL queries
+
+Grafana Explore provides an interface for querying logs stored in Loki.
+
+Open:
+
+**Grafana → Explore → Loki → Code**
+
+### Find all logs
+
+```logql
+{pod=~".+"}
+```
+
+### Find logs from the Loki Canary pod
+
+```logql
+{pod="loki-canary-ptk2w"}
+```
+
+### Find logs from the demo log generator
+
+The verified label for the demo container is:
+
+```logql
+{instance="demo-app/log-generator:log-generator"}
+```
+
+This query returns the test application's log entries.
+
+### Important label information
+
+The current Alloy configuration exposes labels including:
+
+- `instance`
+- `job`
+- `pod`
+- `service_name`
+- `stream`
+
+The `namespace` label was not present in the labels returned by Loki during validation.
+
+The following query therefore does not match the current label structure:
+
+```logql
+{namespace="demo-app", pod="log-generator"}
+```
+
+Adding explicit namespace and container labels is a potential improvement for a future iteration.
+
+## 7. Test workload
+
+A test workload was created to verify the logging pipeline.
+
+```bash
+kubectl run log-generator \
+  --namespace demo-app \
+  --image=busybox:1.36 \
+  --restart=Never \
+  --command -- sh -c 'i=0; while true; do echo "observability-test message=$i"; i=$((i+1)); sleep 5; done'
+```
+
+Check pod status:
+
+```bash
+kubectl get pod log-generator -n demo-app -o wide
+```
+
+Read its logs:
+
+```bash
+kubectl logs log-generator -n demo-app --tail=10
+```
+
+Example output:
+
+```text
+observability-test message=880
+observability-test message=881
+observability-test message=882
+observability-test message=883
+observability-test message=884
+```
+
+## 8. Troubleshooting
+
+### Problem: Grafana shows no logs
+
+Possible causes:
+
+- Incorrect LogQL label selector.
+- Incorrect time range.
+- Alloy is not collecting the workload logs.
+- Loki is not receiving the log streams.
+- Grafana datasource is incorrectly configured.
+
+### Troubleshooting procedure
+
+**Step 1 – Check the workload**
+
+```bash
+kubectl logs log-generator -n demo-app --tail=10
+```
+
+**Step 2 – Check Alloy**
+
+```bash
+kubectl logs deployment/alloy -n logging --tail=100
+```
+
+**Step 3 – Check Loki readiness**
+
+```bash
+curl http://localhost:3100/ready
+```
+
+**Step 4 – Check Loki labels**
+
+```bash
+curl -s http://localhost:3100/loki/api/v1/labels
+```
+
+**Step 5 – Query logs**
+
+Use the verified LogQL selector:
+
+```logql
+{instance="demo-app/log-generator:log-generator"}
+```
+
+### Issue discovered during implementation
+
+Grafana initially returned no logs for:
+
+```logql
+{namespace="demo-app", pod="log-generator"}
+```
+
+The investigation showed that the actual stream used this label:
+
+```text
+instance="demo-app/log-generator:log-generator"
+```
+
+Using the correct label selector resolved the issue.
+
+This demonstrated the importance of inspecting the actual Loki labels before assuming that a Kubernetes metadata field is available as a Loki label.
+
+## 9. Validation checklist
+
+| Validation | Result |
+|---|---|
+| Kubernetes test pod generates logs | PASS |
+| Alloy discovers Kubernetes pods | PASS |
+| Alloy opens Kubernetes log streams | PASS |
+| Alloy ServiceAccount permissions verified | PASS |
+| Loki API responds successfully | PASS |
+| Loki readiness endpoint responds | PASS |
+| Grafana connects to Loki | PASS |
+| Loki logs are visible in Grafana | PASS |
+| LogQL query returns demo application logs | PASS |
+
+## 10. Future improvements
+
+The following improvements are planned:
+
+- Add explicit `namespace`, `pod`, and `container` labels.
+- Create application-specific LogQL queries.
+- Build Grafana logging dashboards.
+- Add alerts for application errors.
+- Add structured JSON logging to the demo API.
+- Configure log retention and storage monitoring.
+- Evaluate persistent and scalable Loki storage for cloud deployment.
+- Integrate logging deployment with Argo CD.
+
+## 11. Definition of Done
+
+The logging phase is considered complete when:
+
+- Loki is deployed and operational.
+- Grafana Alloy discovers Kubernetes workloads.
+- Alloy has the required Kubernetes permissions.
+- Logs are forwarded to Loki.
+- Grafana successfully connects to Loki.
+- LogQL queries return application logs.
+- The logging architecture and troubleshooting procedures are documented.
+
+**Status: COMPLETED – Local Kubernetes logging pipeline validated.**

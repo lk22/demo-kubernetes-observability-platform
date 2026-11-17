@@ -1,0 +1,33 @@
+controller:
+  type: deployment
+  replicas: 1
+
+alloy:
+  enableReporting: false
+  mounts:
+    varlog: false
+  configMap:
+    create: true
+    content: |-
+      logging {
+        level = "info"
+        format = "logfmt"
+      }
+
+      // Discover kubernetes pods
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      // Collect logs from discovered pods
+      loki.source.kubernetes "pods" {
+        targets = discovery.kubernetes.pods.targets
+        forward_to = [loki.write.endpoint.receiver]
+      }
+
+      // Forward logs to Loki Gateway
+      loki.write "endpoint" {
+        endpoint {
+          url = "http://loki-gateway.logging.svc.cluster.local/loki/api/v1/push"
+        }
+      }

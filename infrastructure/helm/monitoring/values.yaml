@@ -1,0 +1,47 @@
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    replicas: 1
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 200m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+
+grafana:
+  enabled: true
+  admin:
+    existingSecret: grafana-admin-password
+    userKey: admin-user
+    passwordKey: admin-password
+  persistence:
+    enabled: true
+    type: pvc
+    size: 5Gi
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    retention: 120h
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+prometheus-node-exporter:
+  enabled: true
+kube-state-metrics:
+  enabled: true

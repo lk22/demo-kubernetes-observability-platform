@@ -5,14 +5,20 @@ metadata:
   namespace: argocd
 spec:
   project: platform-gitops
+
   source:
     repoURL: https://github.com/lk22/demo-kubernetes-observability-platform.git
-    path: gitops-demo
     targetRevision: main
+    path: infrastructure/argocd/bootstrap/gitops-demo
+
   destination:
     server: https://kubernetes.default.svc
     namespace: gitops-demo
 
   syncPolicy:
+    automated:
+      prune: false
+      enabled: true
+      selfHeal: true
     syncOptions:
-      - createNamespace=false
+      - CreateNamespace=false

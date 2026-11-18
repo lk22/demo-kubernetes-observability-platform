@@ -4,9 +4,11 @@ metadata:
   name: platform-gitops
   namespace: argocd
 spec:
-  description: Platform Gitops Project
+  description: GitOps project for the observability platform
+
   sourceRepos:
     - https://github.com/lk22/demo-kubernetes-observability-platform.git
+
   destinations:
     - namespace: gitops-demo
       server: https://kubernetes.default.svc

@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-demo
+  namespace: argocd
+spec:
+  project: platform-gitops
+  source:
+    repoURL: https://github.com/lk22/demo-kubernetes-observability-platform.git
+    path: gitops-demo
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitops-demo
+
+  syncPolicy:
+    syncOptions:
+      - createNamespace=false

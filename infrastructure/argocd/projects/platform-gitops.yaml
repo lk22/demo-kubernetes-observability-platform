@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-gitops
+  namespace: argocd
+spec:
+  description: Platform Gitops Project
+  sourceRepos:
+    - https://github.com/lk22/demo-kubernetes-observability-platform.git
+  destinations:
+    - namespace: gitops-demo
+      server: https://kubernetes.default.svc
+
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: ""
+      kind: Service
+
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

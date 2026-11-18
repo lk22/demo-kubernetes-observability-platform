@@ -1131,3 +1131,11 @@ The logging phase is considered complete when:
 - The logging architecture and troubleshooting procedures are documented.
 
 **Status: COMPLETED – Local Kubernetes logging pipeline validated.**
+
+
+--- get query_range in grafana loki
+curl -G -s "http://localhost:3100/loki/api/v1/query_range" \
+  --data-urlencode 'query={job="loki.source.kubernetes.pods"}' \
+  --data-urlencode 'limit=10' \
+  --data-urlencode "start=$(date -u -v-1H +%s)000000000" \
+  --data-urlencode "end=$(date -u +%s)000000000" | jq

@@ -1,0 +1,100 @@
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: demo-api-alerts
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+              /
+              clamp_min(sum(rate(http_requests_total[5m])), 0.000001)
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            component: demo-api
+          annotations:
+            summary: "Demo API has a high HTTP 5xx error rate"
+            description: "More than 5% of API requests have returned HTTP 5xx errors for at least 2 minutes."
+
+        - alert: HighRequestLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket[5m])
+              )
+            ) > 1
+          for: 2m
+          labels:
+            severity: warning
+            component: demo-api
+          annotations:
+            summary: "Demo API request latency is high"
+            description: "The API p95 request latency has exceeded 1 second for at least 2 minutes."
+
+    - name: kubernetes-alerts
+      rules:
+        - alert: PodCrashLooping
+          expr: |
+            max by (namespace, pod, container) (
+              kube_pod_container_status_waiting_reason{
+                reason="CrashLoopBackOff"
+              }
+            ) == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Container is crash looping"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is in CrashLoopBackOff."
+
+        - alert: PodNotReady
+          expr: |
+            sum by (namespace, pod) (
+              kube_pod_status_ready{condition="false"}
+            ) == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kubernetes pod is not ready"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been not ready for 5 minutes."
+
+        - alert: HighCPUUsage
+          expr: |
+            sum by (namespace, pod) (
+              rate(container_cpu_usage_seconds_total{
+                container!="",
+                container!="POD"
+              }[5m])
+            ) > 0.4
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod CPU usage is high"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 0.4 CPU cores."
+
+        - alert: HighMemoryUsage
+          expr: |
+            sum by (namespace, pod) (
+              container_memory_working_set_bytes{
+                container!="",
+                container!="POD"
+              }
+            ) > 201326592
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod memory usage is high"
+            description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is using more than 192 MiB of memory."

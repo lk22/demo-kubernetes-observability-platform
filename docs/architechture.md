@@ -47,3 +47,39 @@ Design for migrations to EKS, AKS or GKE.
 - Persistent storage
 - Infrastructure as Code
 - GitOps deployment workflows
+
+### GitOps
+
+We are implementing Argo CD for GitOps and verison and installation method
+
+Creating new namespace for all Argo CD resources
+```bash
+kubectl create namespace argocd
+kubectl create namespace gitops-test-namespace <- making sure u either have a test namespace for your deployment or using another namespace for your deployments to be apllied to
+```
+to apply the argo CD manifests we are apply them from following url https://raw.githubusercontent.com/argoproj/argo-cd/v3.6.1/manifests/install.yaml
+
+```bash
+kubectl apply --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.6.1/manifests/install.yaml
+```
+
+this installs all the resources into our cluster on the argo cd namespace.
+
+To access Argo CD web interface run following command
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+if it dont work properly in your browser, your can trustly just open it insecurely
+
+to authenticate properly
+use admin as username
+and get the password from the secret manifest by running following command
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+echo
+```
+
+this echoes out the base64 decoded password from the secret manifest inside the argo CD resources in your cluster

@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-alerts
+  namespace: argocd
+spec:
+  project: platform-gitops
+  source:
+    repoURL: https://github.com/lk22/demo-kubernetes-observability-platform
+    path: infrastructure/kubernetes/monitoring/alerts
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      enabled: false

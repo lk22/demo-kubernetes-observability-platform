@@ -83,3 +83,13 @@ echo
 ```
 
 this echoes out the base64 decoded password from the secret manifest inside the argo CD resources in your cluster
+
+### Troubleshooting
+
+| Argo CD pods dont start | kubectl describe pods -n argocd |
+| Application cannot read github | Control the repo URL branch and repo visibility status (needs to be public) |
+| Application status is OutOfSync | See ressources and errors in Argo CD |
+| Deployment dont starts | kubectl describe deployment <deployment-name> -n <gitops-namespace> |
+| Pod is not ready | kubectl logs deployment/<deployment-name> -n <gitops-namespace>
+| Self healing is not happening | Control that selfHeal: true in the application manifest sync policy |
+| Application shows PermissionDenied | Controll the AppProject manifest, source, destination and resource allowlist |

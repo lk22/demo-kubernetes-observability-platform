@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  namespace: argocd
+  name: demo-api
+spec:
+  project: platform-gitops
+  source:
+    repoURL: https://github.com/lk22/demo-kubernetes-observability-platform.git
+    path: infrastructure/kubernetes/demo-api
+    targetRevision: main
+    helm:
+      releaseName: demo-app
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
+      enabled: false
